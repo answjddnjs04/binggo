@@ -3,40 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BINGO 관리자</title>
+    <title>BINGO 2026</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .title { font-family: 'Space Grotesk', sans-serif; }
+        
+        .bingo-cell {
+            position: relative;
+            aspect-ratio: 1/1;
+            border-radius: 28px;
+            overflow: hidden;
+            border: 3px solid #27272a;
+            transition: all 0.4s cubic-bezier(0.23,1,0.32,1);
+        }
+        .bingo-cell:hover { transform: scale(1.07); border-color: #71717a; }
+        
+        .photo-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0.95;
+        }
+        .bingo-cell.marked .photo-bg { opacity: 0.4; }
+        
+        .mission-overlay {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.92));
+            padding: 20px 16px 16px;
+            font-size: 0.97rem;
+            line-height: 1.4;
+            color: white;
+        }
+        
+        .verified {
+            position: absolute;
+            top: 12px; right: 12px;
+            background: #10b981;
+            color: white;
+            font-size: 11px;
+            padding: 3px 10px;
+            border-radius: 9999px;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.5);
+        }
     </style>
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
-    <div class="max-w-7xl mx-auto px-8 py-12">
+    <div class="max-w-6xl mx-auto px-6 py-12">
         <div class="flex justify-between items-center mb-12">
-            <h1 class="title text-5xl font-bold">BINGO 관리자</h1>
-            <div class="flex gap-4">
-                <button onclick="exportJSON()" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-3xl flex items-center gap-3">
-                    <i class="fas fa-copy"></i> JSON 내보내기
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-3xl">🎲</div>
+                <div>
+                    <h1 class="title text-6xl font-bold tracking-tighter">BINGO</h1>
+                    <p class="text-zinc-400 text-xl">2026 TEAM BATTLE</p>
+                </div>
+            </div>
+            <a href="admin.html" class="px-7 py-3 bg-white text-black font-semibold rounded-2xl flex items-center gap-2 hover:scale-105 transition">
+                <i class="fas fa-cog"></i> 관리자 페이지
+            </a>
+        </div>
+
+        <div class="flex flex-wrap gap-4 mb-12 justify-center" id="tabs"></div>
+
+        <div class="bg-zinc-900/80 backdrop-blur-2xl border border-zinc-800 rounded-3xl p-10">
+            <div class="flex justify-between items-center mb-8">
+                <div id="group-title" class="title text-6xl font-semibold text-white">1조</div>
+                <button onclick="resetCurrent()" class="px-6 py-3 bg-zinc-800 hover:bg-red-950/50 text-red-400 rounded-2xl flex items-center gap-2 text-sm">
+                    <i class="fas fa-trash"></i> 내 진행 초기화
                 </button>
-                <button onclick="saveAll()" class="px-8 py-4 bg-white text-black font-semibold rounded-3xl">저장</button>
+            </div>
+            <div id="board" class="grid grid-cols-4 gap-6"></div>
+        </div>
+    </div>
+
+    <!-- 사진 제출 모달 -->
+    <div id="upload-modal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+        <div class="bg-zinc-900 rounded-3xl p-10 max-w-md w-full mx-4">
+            <h3 class="text-2xl font-semibold mb-2" id="modal-mission"></h3>
+            <p class="text-zinc-400 mb-6">미션 완료 사진을 제출해주세요</p>
+            <input type="file" id="file-input" accept="image/*" class="block w-full text-sm text-zinc-400 file:mr-4 file:py-4 file:px-6 file:rounded-2xl file:border-0 file:bg-zinc-800 file:text-white">
+            <div class="flex gap-4 mt-8">
+                <button onclick="hideModal()" class="flex-1 py-4 bg-zinc-800 rounded-3xl font-medium">취소</button>
+                <button onclick="submitPhoto()" class="flex-1 py-4 bg-emerald-600 rounded-3xl font-semibold">사진 제출하기</button>
             </div>
         </div>
-
-        <div class="mb-8">
-            <select id="group-select" onchange="renderAdmin()" class="bg-zinc-900 border border-zinc-700 rounded-3xl px-8 py-5 text-xl w-full max-w-xs">
-                <!-- JS로 옵션 추가 -->
-            </select>
-        </div>
-
-        <div id="admin-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"></div>
     </div>
 
     <script>
-        let sharedCells = [];
-        let groupSubmissions = {};
-        let currentAdminGroup = 1;
+        let sharedCells = [];           // 공통 미션 + 공식 인증 사진
+        let groupMarked = {};           // 각 조 마킹 상태
+        let groupSubmissions = {};      // 각 조가 제출한 사진 {group: {cellIndex: base64, ...}}
+        let currentGroup = 1;
         const STORAGE_KEY = "bingo2026_v2";
 
         function loadData() {
@@ -44,89 +106,145 @@
             if (saved) {
                 const d = JSON.parse(saved);
                 sharedCells = d.cells || [];
+                groupMarked = d.groupMarked || {};
                 groupSubmissions = d.groupSubmissions || {};
+            } else {
+                sharedCells = Array.from({length:16}, () => ({
+                    mission: "",
+                    officialPhoto: ""
+                }));
+                groupMarked = {};
+                groupSubmissions = {};
             }
-            renderGroupSelect();
-            renderAdmin();
-        }
-
-        function renderGroupSelect() {
-            const select = document.getElementById('group-select');
-            select.innerHTML = '';
-            for (let i = 1; i <= 6; i++) {
-                const opt = document.createElement('option');
-                opt.value = i;
-                opt.textContent = `${i}조`;
-                select.appendChild(opt);
-            }
-        }
-
-        function renderAdmin() {
-            currentAdminGroup = parseInt(document.getElementById('group-select').value);
-            const container = document.getElementById('admin-grid');
-            container.innerHTML = '';
-
-            sharedCells.forEach((cell, idx) => {
-                const subs = groupSubmissions[currentAdminGroup] || {};
-                const submittedPhoto = subs[idx];
-
-                const div = document.createElement('div');
-                div.className = 'bg-zinc-900 border border-zinc-700 rounded-3xl p-6';
-                div.innerHTML = `
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <span class="text-emerald-400 font-mono">칸 ${idx+1}</span>
-                        </div>
-                        <div class="text-right">
-                            <div class="text-xs text-zinc-500">미션</div>
-                            <div class="text-sm">${cell.mission || '미션 없음'}</div>
-                        </div>
-                    </div>
-
-                    ${submittedPhoto ? `
-                    <div class="mb-6 rounded-2xl overflow-hidden border border-zinc-600">
-                        <img src="${submittedPhoto}" class="w-full h-56 object-cover">
-                    </div>
-                    <button onclick="approvePhoto(${idx})" 
-                            class="w-full py-5 bg-emerald-600 hover:bg-emerald-500 rounded-3xl font-semibold text-lg">
-                        ✅ 이 사진으로 미션 인증
-                    </button>` : `
-                    <div class="h-56 bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-500 text-lg">
-                        아직 사진을 제출하지 않았습니다
-                    </div>`}
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        function approvePhoto(idx) {
-            const subs = groupSubmissions[currentAdminGroup] || {};
-            const photo = subs[idx];
-            if (!photo) return;
-
-            if (confirm(`칸 ${idx+1}을 인증하시겠습니까?\n모든 조의 빙고판에 이 사진이 공식 인증 사진으로 표시됩니다.`)) {
-                sharedCells[idx].officialPhoto = photo;
-                saveData();
-                alert("인증 완료되었습니다!");
-                renderAdmin();
+            for (let g = 1; g <= 6; g++) {
+                if (!groupMarked[g]) groupMarked[g] = [];
+                if (!groupSubmissions[g]) groupSubmissions[g] = {};
             }
         }
 
         function saveData() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 cells: sharedCells,
-                groupMarked: JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}').groupMarked || {},
+                groupMarked: groupMarked,
                 groupSubmissions: groupSubmissions
             }));
         }
 
-        function exportJSON() {
-            const data = { cells: sharedCells };
-            navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-            alert("JSON이 클립보드에 복사되었습니다.\nindex.html에서 필요시 불러올 수 있습니다.");
+        function createTabs() {
+            const container = document.getElementById('tabs');
+            container.innerHTML = '';
+            for (let i = 1; i <= 6; i++) {
+                const btn = document.createElement('button');
+                btn.className = `px-10 py-5 text-2xl font-semibold rounded-3xl transition-all ${i === currentGroup ? 'bg-white text-black shadow-2xl' : 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-700'}`;
+                btn.textContent = `${i}조`;
+                btn.onclick = () => switchGroup(i);
+                container.appendChild(btn);
+            }
         }
 
-        window.onload = loadData;
+        function switchGroup(g) {
+            currentGroup = g;
+            createTabs();
+            document.getElementById('group-title').textContent = `${g}조`;
+            renderBoard();
+        }
+
+        function renderBoard() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            const marked = new Set(groupMarked[currentGroup] || []);
+            const subs = groupSubmissions[currentGroup] || {};
+
+            sharedCells.forEach((cell, idx) => {
+                const div = document.createElement('div');
+                div.className = `bingo-cell ${marked.has(idx) ? 'marked' : ''}`;
+
+                const displayPhoto = cell.officialPhoto || subs[idx] || '';
+                div.innerHTML = `
+                    <div class="photo-bg" style="background-image: url('${displayPhoto || 'https://picsum.photos/id/1015/800/600'}')"></div>
+                    <div class="mission-overlay">${cell.mission || '미션 없음'}</div>
+                    ${cell.officialPhoto ? `<div class="verified">✓ 인증됨</div>` : ''}
+                `;
+
+                div.onclick = (e) => {
+                    if (e.detail === 2) showUploadModal(idx);
+                    else toggleMark(idx);
+                };
+                board.appendChild(div);
+            });
+        }
+
+        function toggleMark(idx) {
+            let set = new Set(groupMarked[currentGroup] || []);
+            set.has(idx) ? set.delete(idx) : set.add(idx);
+            groupMarked[currentGroup] = Array.from(set);
+            saveData();
+            renderBoard();
+            checkBingo();
+        }
+
+        function showUploadModal(idx) {
+            window.currentIdx = idx;
+            document.getElementById('modal-mission').textContent = sharedCells[idx].mission || `칸 ${idx+1} 미션`;
+            document.getElementById('file-input').value = '';
+            document.getElementById('upload-modal').classList.remove('hidden');
+        }
+
+        function hideModal() {
+            document.getElementById('upload-modal').classList.add('hidden');
+        }
+
+        function submitPhoto() {
+            const file = document.getElementById('file-input').files[0];
+            if (!file) return alert("사진을 선택해주세요.");
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (!groupSubmissions[currentGroup]) groupSubmissions[currentGroup] = {};
+                groupSubmissions[currentGroup][window.currentIdx] = e.target.result;
+                saveData();
+                hideModal();
+                renderBoard();
+                alert("사진이 관리자에게 제출되었습니다.\n관리자 승인 후 인증됩니다.");
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function checkBingo() {
+            const marked = new Set(groupMarked[currentGroup] || []);
+            const size = 4;
+            for (let r = 0; r < size; r++) if ([...Array(size)].every((_,c) => marked.has(r*size+c))) return showBingo();
+            for (let c = 0; c < size; c++) if ([...Array(size)].every((_,r) => marked.has(r*size+c))) return showBingo();
+            if ([...Array(size)].every((_,i) => marked.has(i*size+i))) return showBingo();
+            if ([...Array(size)].every((_,i) => marked.has(i*size + size-1-i))) return showBingo();
+        }
+
+        function showBingo() {
+            const alert = document.createElement('div');
+            alert.className = "fixed inset-0 bg-black/95 flex items-center justify-center z-[999]";
+            alert.innerHTML = `
+                <div class="text-center">
+                    <div class="text-[180px] mb-6">🎉</div>
+                    <div class="title text-8xl font-bold text-white tracking-tighter">BINGO!</div>
+                    <div class="text-5xl text-emerald-400 mt-4">${currentGroup}조 완성</div>
+                    <button onclick="this.closest('div').remove()" class="mt-12 px-16 py-6 bg-white text-black text-2xl font-semibold rounded-3xl">축하합니다</button>
+                </div>
+            `;
+            document.body.appendChild(alert);
+        }
+
+        function resetCurrent() {
+            if (!confirm(`${currentGroup}조의 마킹을 모두 초기화할까요?`)) return;
+            groupMarked[currentGroup] = [];
+            saveData();
+            renderBoard();
+        }
+
+        window.onload = () => {
+            loadData();
+            createTabs();
+            switchGroup(1);
+        };
     </script>
 </body>
 </html>
