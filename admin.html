@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .title { font-family: 'Space Grotesk', sans-serif; }
     </style>
@@ -15,23 +15,8 @@
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
     <div class="max-w-7xl mx-auto px-8 py-12">
         <div class="flex justify-between items-center mb-12">
-            <h1 class="title text-5xl font-bold">BINGO 관리자 전용</h1>
-            <div class="flex gap-4">
-                <button onclick="exportJSON()" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-3xl flex items-center gap-3">
-                    <i class="fas fa-copy"></i> JSON 내보내기
-                </button>
-                <button onclick="saveAll()" class="px-8 py-4 bg-white text-black font-semibold rounded-3xl">💾 모든 변경 저장</button>
-            </div>
-        </div>
-
-        <!-- 관리자 전용 기능 -->
-        <div class="flex gap-4 mb-8 bg-zinc-900 border border-zinc-700 rounded-3xl p-6">
-            <button onclick="shuffleCells()" class="flex-1 py-5 bg-zinc-800 hover:bg-zinc-700 rounded-2xl flex items-center justify-center gap-3 text-lg">
-                <i class="fas fa-dice"></i> 번호 재배치 (칸 순서 섞기)
-            </button>
-            <button onclick="resetAllGroups()" class="flex-1 py-5 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-2xl flex items-center justify-center gap-3 text-lg">
-                <i class="fas fa-trash"></i> 모든 조 진행 초기화
-            </button>
+            <h1 class="title text-5xl font-bold">BINGO 관리자</h1>
+            <button onclick="saveAll()" class="px-8 py-4 bg-white text-black font-semibold rounded-3xl">저장</button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8" id="admin-grid"></div>
@@ -39,75 +24,53 @@
 
     <script>
         let sharedCells = [];
-        const STORAGE_KEY = "bingo2026_shared";
+        const STORAGE_KEY = "bingo2026_final";
 
         function loadData() {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) sharedCells = JSON.parse(saved).cells || [];
-            else sharedCells = Array.from({length:16}, (_,i) => ({number: i+1, mission: "", photo: ""}));
-            renderGrid();
+            renderAdmin();
         }
 
-        function renderGrid() {
+        function renderAdmin() {
             const container = document.getElementById('admin-grid');
             container.innerHTML = '';
-            sharedCells.forEach((cell, i) => {
+            sharedCells.forEach((cell, idx) => {
                 const div = document.createElement('div');
-                div.className = 'bg-zinc-900 border border-zinc-700 rounded-3xl p-7';
+                div.className = 'bg-zinc-900 border border-zinc-700 rounded-3xl p-6';
                 div.innerHTML = `
-                    <div class="flex justify-between mb-6">
-                        <span class="text-emerald-400 font-mono">칸 ${i+1}</span>
-                        <span class="title text-4xl">${cell.number}</span>
-                    </div>
+                    <textarea rows="3" class="w-full bg-black border border-zinc-700 rounded-2xl p-4 text-sm mb-4" 
+                              onchange="sharedCells[${idx}].mission = this.value">${cell.mission || ''}</textarea>
                     
-                    <div class="mb-6">
-                        <div class="text-xs text-zinc-500 mb-2">미션 내용</div>
-                        <textarea rows="3" class="w-full bg-black border border-zinc-700 rounded-2xl p-4 text-sm" 
-                                  onchange="updateCell(${i}, 'mission', this.value)">${cell.mission || ''}</textarea>
-                    </div>
-                    
-                    <div>
-                        <div class="text-xs text-zinc-500 mb-2">사진 URL (각 칸별로 다르게 가능)</div>
-                        <input type="text" value="${cell.photo || ''}" 
-                               class="w-full bg-black border border-zinc-700 rounded-2xl px-5 py-4 text-sm"
-                               onchange="updateCell(${i}, 'photo', this.value)">
-                    </div>
-                    
-                    ${cell.photo ? `<div class="mt-6 rounded-2xl overflow-hidden"><img src="${cell.photo}" class="w-full h-40 object-cover"></div>` : ''}
+                    <div class="text-sm text-zinc-400 mb-2">제출된 사진 (조별)</div>
+                    ${Object.keys(cell.submissions || {}).map(g => `
+                        <div class="mb-6">
+                            <div class="text-emerald-400 mb-2">${g}조 제출</div>
+                            <img src="${cell.submissions[g]}" class="w-full rounded-2xl border border-zinc-600 mb-2">
+                            <button onclick="approvePhoto(${idx}, ${g})" class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 rounded-2xl font-semibold">
+                                ✅ ${g}조 인증
+                            </button>
+                        </div>
+                    `).join('') || '<div class="h-40 bg-zinc-800 rounded-2xl flex items-center justify-center text-zinc-500">아직 제출 없음</div>'}
                 `;
                 container.appendChild(div);
             });
         }
 
-        function updateCell(index, key, value) {
-            sharedCells[index][key] = value;
+        function approvePhoto(idx, group) {
+            const photo = sharedCells[idx].submissions[group];
+            if (!photo) return;
+            if (!sharedCells[idx].approvedPhotos) sharedCells[idx].approvedPhotos = {};
+            sharedCells[idx].approvedPhotos[group] = photo;
+            delete sharedCells[idx].submissions[group];
+            saveData();
+            alert(`${group}조 칸 ${idx+1} 인증 완료!`);
+            renderAdmin();
         }
 
-        function saveAll() {
-            const full = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-            full.cells = sharedCells;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(full));
-            alert("✅ 저장 완료! index.html 새로고침 후 참가자들이 사진을 선명하게 볼 수 있습니다.");
-        }
-
-        function shuffleCells() {
-            if (!confirm('칸 순서를 완전히 섞으시겠습니까? (미션·사진도 함께 이동)')) return;
-            sharedCells.sort(() => Math.random() - 0.5);
-            renderGrid();
-        }
-
-        function resetAllGroups() {
-            if (!confirm('정말 모든 조의 마킹을 전부 초기화하시겠습니까?')) return;
-            const full = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-            full.groupMarked = {};
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(full));
-            alert("✅ 모든 조 진행 초기화 완료");
-        }
-
-        function exportJSON() {
-            const data = { cells: sharedCells };
-            navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-            alert("✅ JSON 복사 완료! index.html에서 불러오세요.");
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({cells: sharedCells}));
+            alert("미션 저장 완료! index.html 새로고침");
         }
 
         window.onload = loadData;
