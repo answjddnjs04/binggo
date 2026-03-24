@@ -7,262 +7,373 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@600;700&display=swap');
         
-        body {
-            font-family: 'Inter', system_ui, sans-serif;
-        }
-        .title-font {
-            font-family: 'Space Grotesk', sans-serif;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .title { font-family: 'Space Grotesk', sans-serif; }
         
         .bingo-cell {
+            position: relative;
+            overflow: hidden;
             transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
         }
         .bingo-cell:hover {
-            transform: translateY(-4px) scale(1.03);
+            transform: scale(1.04);
+            box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.4);
         }
+        .bingo-cell .photo-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0.25;
+            transition: opacity 0.3s;
+        }
+        .bingo-cell:hover .photo-bg { opacity: 0.35; }
+        
         .bingo-cell.marked {
-            background: linear-gradient(135deg, #22c55e, #86efac) !important;
-            color: #000 !important;
-            border-color: #86efac;
+            background: linear-gradient(135deg, #22c55e, #4ade80) !important;
         }
-        .neon-text {
-            text-shadow: 0 0 20px rgb(163 163 163);
-        }
+        .bingo-cell.marked .photo-bg { opacity: 0.1; }
+        .bingo-cell.marked .content { color: #000 !important; }
+        
+        .neon { text-shadow: 0 0 30px rgb(163 163 163 / 0.6); }
     </style>
 </head>
-<body class="bg-zinc-950 text-zinc-200 min-h-screen">
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
     <div class="max-w-6xl mx-auto px-6 py-12">
         <!-- 헤더 -->
-        <div class="flex justify-between items-end mb-16">
-            <div>
-                <h1 class="title-font text-7xl font-bold tracking-tighter neon-text">BINGO</h1>
-                <p class="text-2xl text-zinc-400 mt-2">2026 TEAM EVENT</p>
+        <div class="flex justify-between items-center mb-12">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-3xl">🎲</div>
+                <div>
+                    <h1 class="title text-6xl font-bold tracking-tighter neon">BINGO</h1>
+                    <p class="text-zinc-400 text-xl">2026 TEAM BATTLE</p>
+                </div>
             </div>
-            <a href="admin.html" 
-               class="flex items-center gap-3 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-2xl text-sm font-medium transition">
-                <i class="fas fa-cog"></i>
-                <span>관리자 페이지</span>
-            </a>
+            
+            <div class="flex items-center gap-6">
+                <button onclick="showImportModal()" 
+                        class="flex items-center gap-2 px-5 py-3 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 rounded-2xl text-sm font-medium">
+                    <i class="fas fa-download"></i>
+                    <span>데이터 불러오기</span>
+                </button>
+                <a href="admin.html" 
+                   class="flex items-center gap-2 px-6 py-3 bg-white text-black font-semibold rounded-2xl hover:scale-105 transition">
+                    <i class="fas fa-cog"></i>
+                    관리자
+                </a>
+            </div>
         </div>
 
         <!-- 그룹 탭 -->
-        <div class="flex flex-wrap gap-3 mb-12" id="tabs">
-            <!-- JavaScript로 생성 -->
-        </div>
+        <div class="flex flex-wrap gap-4 mb-12 justify-center" id="tabs"></div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
             <!-- 빙고판 -->
-            <div class="lg:col-span-7">
-                <div class="bg-zinc-900/70 backdrop-blur-xl border border-zinc-800 rounded-3xl p-10">
+            <div class="lg:col-span-8">
+                <div class="bg-zinc-900/80 backdrop-blur-2xl border border-zinc-800 rounded-3xl p-10">
                     <div class="flex items-center justify-between mb-8">
-                        <div id="current-group" class="title-font text-6xl font-semibold text-white">1조</div>
-                        <div class="flex gap-4">
-                            <button onclick="reshuffleCurrent()" 
-                                    class="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-2xl transition">
-                                <i class="fas fa-dice"></i>
-                                <span class="font-medium">번호 재배치</span>
+                        <div id="group-title" class="title text-6xl font-semibold text-white">1조</div>
+                        <div class="flex gap-3">
+                            <button onclick="reshuffleWarning()" 
+                                    class="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-2xl flex items-center gap-2 text-sm">
+                                <i class="fas fa-dice"></i> 번호 재배치
                             </button>
-                            <button onclick="resetCurrent()" 
-                                    class="flex items-center gap-2 px-6 py-3 bg-zinc-800 hover:bg-red-950/50 text-red-400 rounded-2xl transition">
-                                <i class="fas fa-trash"></i>
-                                <span class="font-medium">초기화</span>
+                            <button onclick="resetCurrentGroup()" 
+                                    class="px-6 py-3 bg-zinc-800 hover:bg-red-900/30 text-red-400 rounded-2xl flex items-center gap-2 text-sm">
+                                <i class="fas fa-trash"></i> 내 진행 초기화
                             </button>
                         </div>
                     </div>
 
-                    <!-- 빙고판 -->
-                    <div id="board" class="grid grid-cols-4 gap-4">
-                        <!-- JS로 생성 -->
-                    </div>
+                    <div id="board" class="grid grid-cols-4 gap-5"></div>
                 </div>
             </div>
 
-            <!-- 사이드 정보 (미션 + 사진) -->
-            <div class="lg:col-span-5 space-y-8">
-                <!-- 미션 카드 -->
-                <div class="bg-zinc-900/70 backdrop-blur-xl border border-zinc-800 rounded-3xl p-8">
-                    <div class="uppercase tracking-widest text-xs text-zinc-500 mb-3">TODAY'S MISSION</div>
-                    <div id="mission-text" class="text-2xl leading-relaxed text-zinc-100">
-                        <!-- JS로 채워짐 -->
+            <!-- 현재 선택된 칸 정보 -->
+            <div class="lg:col-span-4">
+                <div onclick="closeCellInfo()" id="cell-info" 
+                     class="hidden bg-zinc-900/80 backdrop-blur-2xl border border-zinc-700 rounded-3xl p-8 cursor-pointer hover:border-zinc-500 transition">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div id="info-number" class="text-8xl font-bold title text-white"></div>
+                            <div id="info-mission" class="mt-6 text-xl leading-relaxed text-zinc-300"></div>
+                        </div>
+                        <div id="info-photo" class="w-32 h-32 rounded-2xl overflow-hidden border border-zinc-700"></div>
                     </div>
-                </div>
-
-                <!-- 사진 영역 -->
-                <div class="bg-zinc-900/70 backdrop-blur-xl border border-zinc-800 rounded-3xl overflow-hidden">
-                    <div class="uppercase tracking-widest text-xs text-zinc-500 px-8 pt-8 pb-3">TEAM PHOTO</div>
-                    <div id="team-photo" class="aspect-video bg-zinc-950 flex items-center justify-center text-zinc-600">
-                        <!-- JS로 이미지 삽입 -->
-                    </div>
+                    <div class="text-xs text-zinc-500 mt-8">클릭한 칸의 미션과 사진입니다 • 다시 클릭하면 닫힘</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
-        // ====================== 데이터 ======================
-        let boardsData = {};
-        let sharedDataForGroup6 = { numbers: [], mission: "", photoUrl: "" };
-        let currentGroup = 1;
-        const ADMIN_PASSWORD = "1234"; // 실제 배포 시 반드시 변경하세요!
+    <!-- 데이터 불러오기 모달 -->
+    <div id="import-modal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+        <div class="bg-zinc-900 rounded-3xl p-10 max-w-lg w-full">
+            <h3 class="text-2xl font-semibold mb-6">관리자 JSON 붙여넣기</h3>
+            <textarea id="import-json" rows="8" 
+                      class="w-full bg-black border border-zinc-700 rounded-2xl p-6 text-sm font-mono resize-none"></textarea>
+            <div class="flex gap-4 mt-6">
+                <button onclick="hideImportModal()" 
+                        class="flex-1 py-4 bg-zinc-800 rounded-2xl">취소</button>
+                <button onclick="importData()" 
+                        class="flex-1 py-4 bg-white text-black font-semibold rounded-2xl">불러오기</button>
+            </div>
+        </div>
+    </div>
 
-        // 1~5조는 개별, 6조는 공유
-        function initBoards() {
-            for (let g = 1; g <= 5; g++) {
-                let nums = Array.from({length: 16}, (_, i) => i + 1);
-                nums.sort(() => Math.random() - 0.5);
-                boardsData[g] = {
-                    numbers: nums,
-                    marked: new Set(),
-                    mission: "미션 내용을 관리자 페이지에서 설정해주세요",
-                    photoUrl: "https://picsum.photos/id/1015/800/450"
-                };
+    <script>
+        // ==================== 데이터 구조 ====================
+        let sharedCells = [];           // 16개의 {number, mission, photo}
+        let groupMarked = {};           // {1: Set(), 2: Set(), ...}
+        let currentGroup = 1;
+
+        const STORAGE_KEY = "bingo2026_shared";
+
+        // ==================== 초기화 ====================
+        function loadData() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const data = JSON.parse(saved);
+                sharedCells = data.cells || [];
+                groupMarked = data.groupMarked || {};
+            } else {
+                // 기본 데이터 생성
+                sharedCells = Array.from({length: 16}, (_, i) => ({
+                    number: i + 1,
+                    mission: "",
+                    photo: ""
+                }));
+                // 번호 섞기
+                shuffleNumbers();
+                groupMarked = {};
             }
-            // 6조 초기값
-            sharedDataForGroup6 = {
-                numbers: Array.from({length: 16}, (_, i) => i + 1).sort(() => Math.random() - 0.5),
-                mission: "6조 전용 미션 - 관리자에서 수정 가능",
-                photoUrl: "https://picsum.photos/id/201/800/450"
-            };
+            
+            // 모든 그룹에 marked Set 생성
+            for (let g = 1; g <= 6; g++) {
+                if (!groupMarked[g]) groupMarked[g] = [];
+            }
         }
 
-        // ====================== UI ======================
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                cells: sharedCells,
+                groupMarked: groupMarked
+            }));
+        }
+
+        function shuffleNumbers() {
+            let nums = Array.from({length:16}, (_,i) => i+1);
+            nums.sort(() => Math.random() - 0.5);
+            sharedCells.forEach((cell, i) => {
+                cell.number = nums[i];
+            });
+        }
+
+        // ==================== UI ====================
         function createTabs() {
             const container = document.getElementById('tabs');
+            container.innerHTML = '';
             for (let i = 1; i <= 6; i++) {
                 const btn = document.createElement('button');
-                btn.className = `px-10 py-5 text-2xl font-semibold rounded-3xl transition-all ${i === 1 ? 'bg-white text-black shadow-xl' : 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-700'}`;
+                btn.className = `px-9 py-4 text-2xl font-medium rounded-3xl transition-all ${i===1 ? 'bg-white text-black shadow-2xl' : 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-700'}`;
                 btn.textContent = `${i}조`;
                 btn.onclick = () => switchGroup(i);
                 container.appendChild(btn);
             }
         }
 
-        function switchGroup(group) {
-            currentGroup = group;
-            
-            // 탭 스타일
-            document.querySelectorAll('#tabs button').forEach((btn, idx) => {
-                if (parseInt(btn.textContent) === group) {
-                    btn.classList.add('bg-white', 'text-black', 'shadow-xl');
-                    btn.classList.remove('bg-zinc-900', 'hover:bg-zinc-800', 'border', 'border-zinc-700');
+        function switchGroup(g) {
+            currentGroup = g;
+            document.querySelectorAll('#tabs button').forEach(btn => {
+                if (parseInt(btn.textContent) === g) {
+                    btn.classList.add('bg-white', 'text-black', 'shadow-2xl');
+                    btn.classList.remove('bg-zinc-900', 'border', 'border-zinc-700');
                 } else {
-                    btn.classList.remove('bg-white', 'text-black', 'shadow-xl');
-                    btn.classList.add('bg-zinc-900', 'hover:bg-zinc-800', 'border', 'border-zinc-700');
+                    btn.classList.remove('bg-white', 'text-black', 'shadow-2xl');
+                    btn.classList.add('bg-zinc-900', 'border', 'border-zinc-700');
                 }
             });
-
-            document.getElementById('current-group').textContent = `${group}조`;
+            document.getElementById('group-title').textContent = `${g}조`;
             renderBoard();
-            renderSideInfo();
         }
 
         function renderBoard() {
             const board = document.getElementById('board');
             board.innerHTML = '';
             
-            let data = currentGroup === 6 ? sharedDataForGroup6 : boardsData[currentGroup];
+            const markedSet = new Set(groupMarked[currentGroup] || []);
             
-            data.numbers.forEach((num, idx) => {
-                const cell = document.createElement('div');
-                cell.className = `
-                    bingo-cell aspect-square flex items-center justify-center 
-                    bg-zinc-900 border-2 border-zinc-700 hover:border-zinc-400 
-                    text-5xl font-bold rounded-2xl cursor-pointer select-none relative overflow-hidden
+            sharedCells.forEach((cell, index) => {
+                const div = document.createElement('div');
+                div.className = `
+                    bingo-cell aspect-square bg-zinc-900 border border-zinc-700 rounded-3xl flex flex-col 
+                    items-center justify-center cursor-pointer relative overflow-hidden text-center
                 `;
-                if (data.marked.has(idx)) cell.classList.add('marked');
-                
-                cell.innerHTML = `<span>${num}</span>`;
-                cell.onclick = () => toggleMark(idx);
-                board.appendChild(cell);
+                if (markedSet.has(index)) div.classList.add('marked');
+
+                // 사진 배경
+                if (cell.photo) {
+                    const img = document.createElement('div');
+                    img.className = 'photo-bg';
+                    img.style.backgroundImage = `url(${cell.photo})`;
+                    div.appendChild(img);
+                }
+
+                // 내용
+                const content = document.createElement('div');
+                content.className = 'content relative z-10 flex flex-col items-center justify-center h-full px-4';
+                content.innerHTML = `
+                    <div class="text-6xl font-bold title tracking-tighter text-white drop-shadow-md">${cell.number}</div>
+                    ${cell.mission ? `<div class="mt-4 text-xs leading-tight text-zinc-300 line-clamp-3 max-w-[90%]">${cell.mission}</div>` : ''}
+                `;
+                div.appendChild(content);
+
+                // 클릭 이벤트 (마킹 + 정보 보기)
+                div.onclick = (e) => {
+                    if (e.detail === 2) { // 더블클릭 = 정보 보기
+                        showCellInfo(index);
+                    } else {
+                        toggleMark(index);
+                    }
+                };
+                board.appendChild(div);
             });
         }
 
-        function toggleMark(idx) {
-            let data = currentGroup === 6 ? sharedDataForGroup6 : boardsData[currentGroup];
-            if (data.marked.has(idx)) {
-                data.marked.delete(idx);
-            } else {
-                data.marked.add(idx);
+        function toggleMark(index) {
+            let markedSet = groupMarked[currentGroup];
+            if (!markedSet) {
+                groupMarked[currentGroup] = [];
+                markedSet = groupMarked[currentGroup];
             }
+            
+            const set = new Set(markedSet);
+            if (set.has(index)) {
+                set.delete(index);
+            } else {
+                set.add(index);
+            }
+            groupMarked[currentGroup] = Array.from(set);
+            
+            saveData();
             renderBoard();
             checkBingo();
         }
 
-        function renderSideInfo() {
-            let data = currentGroup === 6 ? sharedDataForGroup6 : boardsData[currentGroup];
+        function showCellInfo(index) {
+            const cell = sharedCells[index];
+            document.getElementById('info-number').textContent = cell.number;
+            document.getElementById('info-mission').textContent = cell.mission || '미션이 없습니다';
             
-            document.getElementById('mission-text').textContent = data.mission;
-            
-            const photoDiv = document.getElementById('team-photo');
-            if (data.photoUrl) {
-                photoDiv.innerHTML = `<img src="${data.photoUrl}" class="w-full h-full object-cover">`;
+            const photoDiv = document.getElementById('info-photo');
+            if (cell.photo) {
+                photoDiv.innerHTML = `<img src="${cell.photo}" class="w-full h-full object-cover">`;
             } else {
-                photoDiv.innerHTML = `<span class="text-4xl">📸</span>`;
+                photoDiv.innerHTML = `<div class="w-full h-full bg-zinc-800 flex items-center justify-center text-6xl">📸</div>`;
             }
+            
+            document.getElementById('cell-info').classList.remove('hidden');
+            document.getElementById('cell-info').dataset.index = index;
+        }
+
+        function closeCellInfo() {
+            document.getElementById('cell-info').classList.add('hidden');
         }
 
         function checkBingo() {
-            let data = currentGroup === 6 ? sharedDataForGroup6 : boardsData[currentGroup];
-            // (기존 빙고 체크 로직 그대로 사용)
+            const markedSet = new Set(groupMarked[currentGroup] || []);
             const size = 4;
-            const marked = data.marked;
             
-            // 행, 열, 대각선 체크 (생략 없이 전체 넣음)
+            // 행 체크
             for (let r = 0; r < size; r++) {
-                if ([...Array(size).keys()].every(c => marked.has(r*size + c))) return showBingo();
+                if (Array.from({length: size}, (_, c) => r*size + c).every(i => markedSet.has(i))) {
+                    showBingoAlert();
+                    return;
+                }
             }
+            // 열 체크
             for (let c = 0; c < size; c++) {
-                if ([...Array(size).keys()].every(r => marked.has(r*size + c))) return showBingo();
+                if (Array.from({length: size}, (_, r) => r*size + c).every(i => markedSet.has(i))) {
+                    showBingoAlert();
+                    return;
+                }
             }
-            if ([...Array(size).keys()].every(i => marked.has(i*size + i))) return showBingo();
-            if ([...Array(size).keys()].every(i => marked.has(i*size + (size-1-i)))) return showBingo();
+            // 대각선
+            if (Array.from({length: size}, (_, i) => i*size + i).every(i => markedSet.has(i))) {
+                showBingoAlert();
+                return;
+            }
+            if (Array.from({length: size}, (_, i) => i*size + (size-1-i)).every(i => markedSet.has(i))) {
+                showBingoAlert();
+            }
         }
 
-        function showBingo() {
-            const alert = document.createElement('div');
-            alert.className = "fixed inset-0 bg-black/90 flex items-center justify-center z-50";
-            alert.innerHTML = `
+        function showBingoAlert() {
+            const div = document.createElement('div');
+            div.className = 'fixed inset-0 bg-black/95 flex items-center justify-center z-[999]';
+            div.innerHTML = `
                 <div class="text-center">
-                    <div class="text-[180px] leading-none mb-6">🎉</div>
-                    <div class="title-font text-8xl font-bold text-white tracking-tighter mb-4">BINGO</div>
-                    <div class="text-4xl text-emerald-400">${currentGroup}조 완성!</div>
-                    <button onclick="this.closest('.fixed').remove()" 
-                            class="mt-12 px-16 py-6 bg-white text-black font-semibold text-2xl rounded-2xl hover:scale-105 transition">
-                        확인
+                    <div class="text-[200px] mb-8">🎉</div>
+                    <div class="title text-8xl font-bold tracking-[-4px] text-white mb-4">BINGO</div>
+                    <div class="text-4xl text-emerald-400">${currentGroup}조 승리!</div>
+                    <button onclick="this.closest('div').remove()" 
+                            class="mt-12 px-20 py-7 bg-white text-black text-2xl font-semibold rounded-3xl hover:scale-110 transition">
+                        멋져요!
                     </button>
                 </div>
             `;
-            document.body.appendChild(alert);
+            document.body.appendChild(div);
         }
 
-        function reshuffleCurrent() {
-            if (currentGroup === 6) {
-                sharedDataForGroup6.numbers = Array.from({length:16}, (_,i)=>i+1).sort(()=>Math.random()-0.5);
-            } else {
-                boardsData[currentGroup].numbers = Array.from({length:16}, (_,i)=>i+1).sort(()=>Math.random()-0.5);
+        // ==================== 기능 버튼 ====================
+        function resetCurrentGroup() {
+            if (!confirm(`${currentGroup}조의 마킹을 모두 지우시겠습니까?`)) return;
+            groupMarked[currentGroup] = [];
+            saveData();
+            renderBoard();
+        }
+
+        function reshuffleWarning() {
+            alert("번호 재배치는 관리자 페이지에서만 가능합니다.\nadmin.html로 이동해주세요.");
+        }
+
+        // ==================== 데이터 불러오기 ====================
+        function showImportModal() {
+            document.getElementById('import-modal').classList.remove('hidden');
+            document.getElementById('import-json').focus();
+        }
+        function hideImportModal() {
+            document.getElementById('import-modal').classList.add('hidden');
+        }
+        function importData() {
+            try {
+                const json = document.getElementById('import-json').value.trim();
+                const imported = JSON.parse(json);
+                
+                if (imported.cells && Array.isArray(imported.cells)) {
+                    sharedCells = imported.cells;
+                    saveData();
+                    hideImportModal();
+                    renderBoard();
+                    alert("✅ 모든 조의 빙고판이 업데이트되었습니다!");
+                } else {
+                    alert("올바른 JSON 형식이 아닙니다.");
+                }
+            } catch(e) {
+                alert("JSON 파싱 실패. 정확히 복사했는지 확인해주세요.");
             }
-            boardsData[currentGroup].marked.clear();
-            renderBoard();
         }
 
-        function resetCurrent() {
-            if (!confirm(`${currentGroup}조를 초기화하시겠습니까?`)) return;
-            let data = currentGroup === 6 ? sharedDataForGroup6 : boardsData[currentGroup];
-            data.marked.clear();
-            renderBoard();
-        }
-
-        // ====================== 관리자 페이지 ======================
-        // admin.html 파일을 따로 만들어 아래 코드를 넣어주세요.
-        // (필요하시면 admin.html 전체 코드도 바로 드리겠습니다)
-
-        // 초기 실행
+        // ==================== 시작 ====================
         window.onload = () => {
-            initBoards();
+            loadData();
             createTabs();
             switchGroup(1);
+            
+            // Tailwind 실행
+            document.documentElement.style.setProperty('--tw-ring-color', 'rgb(163 163 163)');
         };
     </script>
 </body>
