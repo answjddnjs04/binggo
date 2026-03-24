@@ -18,6 +18,7 @@
             overflow: hidden;
             border: 3px solid #27272a;
             transition: all 0.4s cubic-bezier(0.23,1,0.32,1);
+            cursor: pointer;
         }
         .bingo-cell:hover { transform: scale(1.07); border-color: #71717a; }
         
@@ -64,7 +65,7 @@
                 </div>
             </div>
             <a href="admin.html" class="px-7 py-3 bg-white text-black font-semibold rounded-2xl flex items-center gap-2 hover:scale-105 transition">
-                <i class="fas fa-cog"></i> 관리자 페이지
+                <i class="fas fa-cog"></i> 관리자
             </a>
         </div>
 
@@ -81,25 +82,34 @@
         </div>
     </div>
 
-    <!-- 사진 제출 모달 -->
-    <div id="upload-modal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
-        <div class="bg-zinc-900 rounded-3xl p-10 max-w-md w-full mx-4">
-            <h3 class="text-2xl font-semibold mb-2" id="modal-mission"></h3>
-            <p class="text-zinc-400 mb-6">미션 완료 사진을 제출해주세요</p>
-            <input type="file" id="file-input" accept="image/*" class="block w-full text-sm text-zinc-400 file:mr-4 file:py-4 file:px-6 file:rounded-2xl file:border-0 file:bg-zinc-800 file:text-white">
-            <div class="flex gap-4 mt-8">
-                <button onclick="hideModal()" class="flex-1 py-4 bg-zinc-800 rounded-3xl font-medium">취소</button>
-                <button onclick="submitPhoto()" class="flex-1 py-4 bg-emerald-600 rounded-3xl font-semibold">사진 제출하기</button>
+    <!-- 사진 크게 보기 + 제출 모달 -->
+    <div id="detail-modal" class="hidden fixed inset-0 bg-black/95 z-50 flex items-center justify-center">
+        <div class="relative max-w-4xl w-full mx-4">
+            <button onclick="closeDetailModal()" class="absolute top-6 right-6 text-white text-4xl hover:text-zinc-300 transition">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="text-center mb-6">
+                <div id="modal-mission" class="text-3xl font-semibold mb-2"></div>
+                <p class="text-zinc-400">미션 성공 사진 제출 / 확인</p>
+            </div>
+            <div class="bg-zinc-900 rounded-3xl p-8">
+                <div id="modal-photo" class="w-full aspect-video bg-zinc-800 rounded-2xl overflow-hidden border border-zinc-700 mb-6">
+                    <!-- 사진 표시 -->
+                </div>
+                <div class="flex gap-4">
+                    <input type="file" id="file-input" accept="image/*" class="flex-1 text-sm text-zinc-400 file:mr-4 file:py-4 file:px-6 file:rounded-2xl file:border-0 file:bg-zinc-800 file:text-white">
+                    <button onclick="submitPhoto()" class="px-10 py-4 bg-emerald-600 rounded-3xl font-semibold">사진 제출</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        let sharedCells = [];           // 공통 미션 + 공식 인증 사진
-        let groupMarked = {};           // 각 조 마킹 상태
-        let groupSubmissions = {};      // 각 조가 제출한 사진 {group: {cellIndex: base64, ...}}
+        let sharedCells = []; // {mission: "...", approvedPhotos: {group1: "base64", group2: "base64", ...}}
+        let groupMarked = {};
         let currentGroup = 1;
-        const STORAGE_KEY = "bingo2026_v2";
+        let currentDetailIdx = -1;
+        const STORAGE_KEY = "bingo2026_final";
 
         function loadData() {
             const saved = localStorage.getItem(STORAGE_KEY);
@@ -107,26 +117,22 @@
                 const d = JSON.parse(saved);
                 sharedCells = d.cells || [];
                 groupMarked = d.groupMarked || {};
-                groupSubmissions = d.groupSubmissions || {};
             } else {
                 sharedCells = Array.from({length:16}, () => ({
                     mission: "",
-                    officialPhoto: ""
+                    approvedPhotos: {}
                 }));
                 groupMarked = {};
-                groupSubmissions = {};
             }
             for (let g = 1; g <= 6; g++) {
                 if (!groupMarked[g]) groupMarked[g] = [];
-                if (!groupSubmissions[g]) groupSubmissions[g] = {};
             }
         }
 
         function saveData() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 cells: sharedCells,
-                groupMarked: groupMarked,
-                groupSubmissions: groupSubmissions
+                groupMarked: groupMarked
             }));
         }
 
@@ -153,25 +159,53 @@
             const board = document.getElementById('board');
             board.innerHTML = '';
             const marked = new Set(groupMarked[currentGroup] || []);
-            const subs = groupSubmissions[currentGroup] || {};
+            const approved = sharedCells[0]?.approvedPhotos?.[currentGroup] || {};
 
             sharedCells.forEach((cell, idx) => {
                 const div = document.createElement('div');
                 div.className = `bingo-cell ${marked.has(idx) ? 'marked' : ''}`;
 
-                const displayPhoto = cell.officialPhoto || subs[idx] || '';
+                const photo = approved[idx];
                 div.innerHTML = `
-                    <div class="photo-bg" style="background-image: url('${displayPhoto || 'https://picsum.photos/id/1015/800/600'}')"></div>
+                    <div class="photo-bg" style="background-image: url('${photo || 'https://picsum.photos/id/1015/800/600'}')"></div>
                     <div class="mission-overlay">${cell.mission || '미션 없음'}</div>
-                    ${cell.officialPhoto ? `<div class="verified">✓ 인증됨</div>` : ''}
+                    ${photo ? `<div class="verified">✓ 인증</div>` : ''}
                 `;
 
-                div.onclick = (e) => {
-                    if (e.detail === 2) showUploadModal(idx);
-                    else toggleMark(idx);
-                };
+                div.onclick = () => showDetailModal(idx);
                 board.appendChild(div);
             });
+        }
+
+        function showDetailModal(idx) {
+            currentDetailIdx = idx;
+            const cell = sharedCells[idx];
+            document.getElementById('modal-mission').textContent = cell.mission || `칸 ${idx+1}`;
+            const photo = cell.approvedPhotos?.[currentGroup];
+            document.getElementById('modal-photo').innerHTML = photo 
+                ? `<img src="${photo}" class="w-full h-full object-cover">`
+                : `<div class="w-full h-full flex items-center justify-center text-7xl text-zinc-600">📸</div>`;
+            document.getElementById('detail-modal').classList.remove('hidden');
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detail-modal').classList.add('hidden');
+        }
+
+        function submitPhoto() {
+            const file = document.getElementById('file-input').files[0];
+            if (!file) return alert("사진을 선택해주세요.");
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                // 제출은 localStorage에 저장 (관리자 페이지에서 확인 가능하도록)
+                if (!sharedCells[currentDetailIdx].submissions) sharedCells[currentDetailIdx].submissions = {};
+                sharedCells[currentDetailIdx].submissions[currentGroup] = e.target.result;
+                saveData();
+                closeDetailModal();
+                alert("사진이 관리자에게 제출되었습니다! 승인 대기 중입니다.");
+            };
+            reader.readAsDataURL(file);
         }
 
         function toggleMark(idx) {
@@ -183,40 +217,22 @@
             checkBingo();
         }
 
-        function showUploadModal(idx) {
-            window.currentIdx = idx;
-            document.getElementById('modal-mission').textContent = sharedCells[idx].mission || `칸 ${idx+1} 미션`;
-            document.getElementById('file-input').value = '';
-            document.getElementById('upload-modal').classList.remove('hidden');
-        }
-
-        function hideModal() {
-            document.getElementById('upload-modal').classList.add('hidden');
-        }
-
-        function submitPhoto() {
-            const file = document.getElementById('file-input').files[0];
-            if (!file) return alert("사진을 선택해주세요.");
-
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                if (!groupSubmissions[currentGroup]) groupSubmissions[currentGroup] = {};
-                groupSubmissions[currentGroup][window.currentIdx] = e.target.result;
-                saveData();
-                hideModal();
-                renderBoard();
-                alert("사진이 관리자에게 제출되었습니다.\n관리자 승인 후 인증됩니다.");
-            };
-            reader.readAsDataURL(file);
-        }
-
         function checkBingo() {
             const marked = new Set(groupMarked[currentGroup] || []);
             const size = 4;
-            for (let r = 0; r < size; r++) if ([...Array(size)].every((_,c) => marked.has(r*size+c))) return showBingo();
-            for (let c = 0; c < size; c++) if ([...Array(size)].every((_,r) => marked.has(r*size+c))) return showBingo();
-            if ([...Array(size)].every((_,i) => marked.has(i*size+i))) return showBingo();
-            if ([...Array(size)].every((_,i) => marked.has(i*size + size-1-i))) return showBingo();
+            const checks = [
+                () => [...Array(size)].every((_,c) => marked.has(0*size + c)),
+                () => [...Array(size)].every((_,c) => marked.has(1*size + c)),
+                () => [...Array(size)].every((_,c) => marked.has(2*size + c)),
+                () => [...Array(size)].every((_,c) => marked.has(3*size + c)),
+                () => [...Array(size)].every((_,r) => marked.has(r*size + 0)),
+                () => [...Array(size)].every((_,r) => marked.has(r*size + 1)),
+                () => [...Array(size)].every((_,r) => marked.has(r*size + 2)),
+                () => [...Array(size)].every((_,r) => marked.has(r*size + 3)),
+                () => [...Array(size)].every((_,i) => marked.has(i*size + i)),
+                () => [...Array(size)].every((_,i) => marked.has(i*size + (size-1-i)))
+            ];
+            if (checks.some(check => check())) showBingo();
         }
 
         function showBingo() {
@@ -234,7 +250,7 @@
         }
 
         function resetCurrent() {
-            if (!confirm(`${currentGroup}조의 마킹을 모두 초기화할까요?`)) return;
+            if (!confirm(`${currentGroup}조 마킹 초기화?`)) return;
             groupMarked[currentGroup] = [];
             saveData();
             renderBoard();
