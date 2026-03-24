@@ -15,29 +15,70 @@
         .bingo-cell {
             position: relative;
             overflow: hidden;
+            aspect-ratio: 1/1;
             transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            border-radius: 24px;
         }
         .bingo-cell:hover {
-            transform: scale(1.04);
-            box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.4);
+            transform: scale(1.06);
+            box-shadow: 0 30px 60px -15px rgb(0 0 0 / 0.5);
         }
-        .bingo-cell .photo-bg {
+        
+        .photo-bg {
             position: absolute;
             inset: 0;
             background-size: cover;
             background-position: center;
+            opacity: 0.65;
+            filter: brightness(0.85);
+            transition: all 0.4s;
+        }
+        .bingo-cell:hover .photo-bg {
+            opacity: 0.85;
+            filter: brightness(1);
+        }
+        
+        .bingo-cell.marked .photo-bg {
             opacity: 0.25;
-            transition: opacity 0.3s;
+            filter: brightness(0.6);
         }
-        .bingo-cell:hover .photo-bg { opacity: 0.35; }
         
-        .bingo-cell.marked {
-            background: linear-gradient(135deg, #22c55e, #4ade80) !important;
+        .content {
+            position: relative;
+            z-index: 10;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            text-align: center;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.6));
         }
-        .bingo-cell.marked .photo-bg { opacity: 0.1; }
-        .bingo-cell.marked .content { color: #000 !important; }
         
-        .neon { text-shadow: 0 0 30px rgb(163 163 163 / 0.6); }
+        .bingo-cell.marked .content {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.95), rgba(74, 222, 128, 0.95));
+            color: #000;
+        }
+        
+        .number {
+            font-size: 3.5rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+        
+        .mission-text {
+            font-size: 0.875rem;
+            line-height: 1.35;
+            max-height: 3.2em;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+        
+        .neon { text-shadow: 0 0 25px rgb(163 163 163 / 0.7); }
     </style>
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
@@ -76,10 +117,6 @@
                     <div class="flex items-center justify-between mb-8">
                         <div id="group-title" class="title text-6xl font-semibold text-white">1조</div>
                         <div class="flex gap-3">
-                            <button onclick="reshuffleWarning()" 
-                                    class="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-2xl flex items-center gap-2 text-sm">
-                                <i class="fas fa-dice"></i> 번호 재배치
-                            </button>
                             <button onclick="resetCurrentGroup()" 
                                     class="px-6 py-3 bg-zinc-800 hover:bg-red-900/30 text-red-400 rounded-2xl flex items-center gap-2 text-sm">
                                 <i class="fas fa-trash"></i> 내 진행 초기화
@@ -91,18 +128,18 @@
                 </div>
             </div>
 
-            <!-- 현재 선택된 칸 정보 -->
+            <!-- 선택된 칸 상세 -->
             <div class="lg:col-span-4">
                 <div onclick="closeCellInfo()" id="cell-info" 
                      class="hidden bg-zinc-900/80 backdrop-blur-2xl border border-zinc-700 rounded-3xl p-8 cursor-pointer hover:border-zinc-500 transition">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <div id="info-number" class="text-8xl font-bold title text-white"></div>
-                            <div id="info-mission" class="mt-6 text-xl leading-relaxed text-zinc-300"></div>
+                    <div class="flex justify-between items-start gap-6">
+                        <div class="flex-1">
+                            <div id="info-number" class="title text-8xl font-bold text-white mb-6"></div>
+                            <div id="info-mission" class="text-xl leading-relaxed text-zinc-200"></div>
                         </div>
-                        <div id="info-photo" class="w-32 h-32 rounded-2xl overflow-hidden border border-zinc-700"></div>
+                        <div id="info-photo" class="w-52 h-52 flex-shrink-0 rounded-3xl overflow-hidden border border-zinc-600 shadow-inner"></div>
                     </div>
-                    <div class="text-xs text-zinc-500 mt-8">클릭한 칸의 미션과 사진입니다 • 다시 클릭하면 닫힘</div>
+                    <div class="mt-8 text-xs text-zinc-500">칸을 클릭하면 마킹 • 더블클릭하면 상세 보기</div>
                 </div>
             </div>
         </div>
@@ -110,28 +147,27 @@
 
     <!-- 데이터 불러오기 모달 -->
     <div id="import-modal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
-        <div class="bg-zinc-900 rounded-3xl p-10 max-w-lg w-full">
-            <h3 class="text-2xl font-semibold mb-6">관리자 JSON 붙여넣기</h3>
-            <textarea id="import-json" rows="8" 
-                      class="w-full bg-black border border-zinc-700 rounded-2xl p-6 text-sm font-mono resize-none"></textarea>
-            <div class="flex gap-4 mt-6">
+        <div class="bg-zinc-900 rounded-3xl p-10 max-w-lg w-full mx-4">
+            <h3 class="title text-3xl font-semibold mb-6">관리자 JSON 불러오기</h3>
+            <textarea id="import-json" rows="10" 
+                      class="w-full bg-black border border-zinc-700 rounded-3xl p-6 font-mono text-sm resize-y min-h-[220px]"></textarea>
+            <div class="flex gap-4 mt-8">
                 <button onclick="hideImportModal()" 
-                        class="flex-1 py-4 bg-zinc-800 rounded-2xl">취소</button>
+                        class="flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-3xl font-medium">취소</button>
                 <button onclick="importData()" 
-                        class="flex-1 py-4 bg-white text-black font-semibold rounded-2xl">불러오기</button>
+                        class="flex-1 py-4 bg-white text-black font-semibold rounded-3xl">불러오기 & 적용</button>
             </div>
         </div>
     </div>
 
     <script>
-        // ==================== 데이터 구조 ====================
-        let sharedCells = [];           // 16개의 {number, mission, photo}
-        let groupMarked = {};           // {1: Set(), 2: Set(), ...}
+        // ==================== 데이터 ====================
+        let sharedCells = [];           // 16개 칸 {number, mission, photo}
+        let groupMarked = {};           // 각 조별 마킹 배열
         let currentGroup = 1;
-
         const STORAGE_KEY = "bingo2026_shared";
 
-        // ==================== 초기화 ====================
+        // ==================== 로드 & 저장 ====================
         function loadData() {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) {
@@ -139,18 +175,15 @@
                 sharedCells = data.cells || [];
                 groupMarked = data.groupMarked || {};
             } else {
-                // 기본 데이터 생성
+                // 기본 16칸 (번호는 1~16 순서대로)
                 sharedCells = Array.from({length: 16}, (_, i) => ({
                     number: i + 1,
                     mission: "",
                     photo: ""
                 }));
-                // 번호 섞기
-                shuffleNumbers();
                 groupMarked = {};
             }
-            
-            // 모든 그룹에 marked Set 생성
+            // 모든 그룹 초기화
             for (let g = 1; g <= 6; g++) {
                 if (!groupMarked[g]) groupMarked[g] = [];
             }
@@ -163,21 +196,13 @@
             }));
         }
 
-        function shuffleNumbers() {
-            let nums = Array.from({length:16}, (_,i) => i+1);
-            nums.sort(() => Math.random() - 0.5);
-            sharedCells.forEach((cell, i) => {
-                cell.number = nums[i];
-            });
-        }
-
         // ==================== UI ====================
         function createTabs() {
             const container = document.getElementById('tabs');
             container.innerHTML = '';
             for (let i = 1; i <= 6; i++) {
                 const btn = document.createElement('button');
-                btn.className = `px-9 py-4 text-2xl font-medium rounded-3xl transition-all ${i===1 ? 'bg-white text-black shadow-2xl' : 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-700'}`;
+                btn.className = `px-10 py-5 text-2xl font-semibold rounded-3xl transition-all ${i===1 ? 'bg-white text-black shadow-2xl' : 'bg-zinc-900 hover:bg-zinc-800 border border-zinc-700'}`;
                 btn.textContent = `${i}조`;
                 btn.onclick = () => switchGroup(i);
                 container.appendChild(btn);
@@ -187,7 +212,8 @@
         function switchGroup(g) {
             currentGroup = g;
             document.querySelectorAll('#tabs button').forEach(btn => {
-                if (parseInt(btn.textContent) === g) {
+                const isActive = parseInt(btn.textContent) === g;
+                if (isActive) {
                     btn.classList.add('bg-white', 'text-black', 'shadow-2xl');
                     btn.classList.remove('bg-zinc-900', 'border', 'border-zinc-700');
                 } else {
@@ -207,56 +233,49 @@
             
             sharedCells.forEach((cell, index) => {
                 const div = document.createElement('div');
-                div.className = `
-                    bingo-cell aspect-square bg-zinc-900 border border-zinc-700 rounded-3xl flex flex-col 
-                    items-center justify-center cursor-pointer relative overflow-hidden text-center
-                `;
+                div.className = `bingo-cell border-2 border-zinc-700 bg-zinc-900 cursor-pointer`;
                 if (markedSet.has(index)) div.classList.add('marked');
 
-                // 사진 배경
+                // 사진 배경 (더 잘 보이게 opacity 높임)
+                let html = '';
                 if (cell.photo) {
-                    const img = document.createElement('div');
-                    img.className = 'photo-bg';
-                    img.style.backgroundImage = `url(${cell.photo})`;
-                    div.appendChild(img);
+                    html += `<div class="photo-bg" style="background-image: url('${cell.photo}')"></div>`;
                 }
 
                 // 내용
-                const content = document.createElement('div');
-                content.className = 'content relative z-10 flex flex-col items-center justify-center h-full px-4';
-                content.innerHTML = `
-                    <div class="text-6xl font-bold title tracking-tighter text-white drop-shadow-md">${cell.number}</div>
-                    ${cell.mission ? `<div class="mt-4 text-xs leading-tight text-zinc-300 line-clamp-3 max-w-[90%]">${cell.mission}</div>` : ''}
+                html += `
+                    <div class="content">
+                        <div class="number text-white">${cell.number}</div>
+                        ${cell.mission ? `<div class="mission-text text-zinc-100">${cell.mission}</div>` : ''}
+                    </div>
                 `;
-                div.appendChild(content);
 
-                // 클릭 이벤트 (마킹 + 정보 보기)
-                div.onclick = (e) => {
-                    if (e.detail === 2) { // 더블클릭 = 정보 보기
+                div.innerHTML = html;
+
+                // 클릭 = 마킹, 더블클릭 = 상세 보기
+                div.addEventListener('click', (e) => {
+                    if (e.detail === 2) {
                         showCellInfo(index);
                     } else {
                         toggleMark(index);
                     }
-                };
+                });
+
                 board.appendChild(div);
             });
         }
 
         function toggleMark(index) {
-            let markedSet = groupMarked[currentGroup];
-            if (!markedSet) {
-                groupMarked[currentGroup] = [];
-                markedSet = groupMarked[currentGroup];
-            }
+            let marked = groupMarked[currentGroup] || [];
+            const set = new Set(marked);
             
-            const set = new Set(markedSet);
             if (set.has(index)) {
                 set.delete(index);
             } else {
                 set.add(index);
             }
-            groupMarked[currentGroup] = Array.from(set);
             
+            groupMarked[currentGroup] = Array.from(set);
             saveData();
             renderBoard();
             checkBingo();
@@ -265,17 +284,18 @@
         function showCellInfo(index) {
             const cell = sharedCells[index];
             document.getElementById('info-number').textContent = cell.number;
-            document.getElementById('info-mission').textContent = cell.mission || '미션이 없습니다';
+            document.getElementById('info-mission').innerHTML = cell.mission 
+                ? `<span class="text-emerald-300">미션:</span> ${cell.mission}` 
+                : '미션이 등록되지 않았습니다';
             
-            const photoDiv = document.getElementById('info-photo');
+            const photoContainer = document.getElementById('info-photo');
             if (cell.photo) {
-                photoDiv.innerHTML = `<img src="${cell.photo}" class="w-full h-full object-cover">`;
+                photoContainer.innerHTML = `<img src="${cell.photo}" class="w-full h-full object-cover">`;
             } else {
-                photoDiv.innerHTML = `<div class="w-full h-full bg-zinc-800 flex items-center justify-center text-6xl">📸</div>`;
+                photoContainer.innerHTML = `<div class="w-full h-full bg-zinc-800 flex items-center justify-center text-8xl text-zinc-600">📸</div>`;
             }
             
             document.getElementById('cell-info').classList.remove('hidden');
-            document.getElementById('cell-info').dataset.index = index;
         }
 
         function closeCellInfo() {
@@ -286,83 +306,65 @@
             const markedSet = new Set(groupMarked[currentGroup] || []);
             const size = 4;
             
-            // 행 체크
+            // 행
             for (let r = 0; r < size; r++) {
-                if (Array.from({length: size}, (_, c) => r*size + c).every(i => markedSet.has(i))) {
-                    showBingoAlert();
-                    return;
-                }
+                if (Array.from({length:size}, (_,c) => r*size + c).every(i => markedSet.has(i))) return showBingoAlert();
             }
-            // 열 체크
+            // 열
             for (let c = 0; c < size; c++) {
-                if (Array.from({length: size}, (_, r) => r*size + c).every(i => markedSet.has(i))) {
-                    showBingoAlert();
-                    return;
-                }
+                if (Array.from({length:size}, (_,r) => r*size + c).every(i => markedSet.has(i))) return showBingoAlert();
             }
             // 대각선
-            if (Array.from({length: size}, (_, i) => i*size + i).every(i => markedSet.has(i))) {
-                showBingoAlert();
-                return;
-            }
-            if (Array.from({length: size}, (_, i) => i*size + (size-1-i)).every(i => markedSet.has(i))) {
-                showBingoAlert();
-            }
+            if (Array.from({length:size}, (_,i) => i*size + i).every(i => markedSet.has(i))) return showBingoAlert();
+            if (Array.from({length:size}, (_,i) => i*size + (size-1-i)).every(i => markedSet.has(i))) return showBingoAlert();
         }
 
         function showBingoAlert() {
             const div = document.createElement('div');
             div.className = 'fixed inset-0 bg-black/95 flex items-center justify-center z-[999]';
             div.innerHTML = `
-                <div class="text-center">
-                    <div class="text-[200px] mb-8">🎉</div>
-                    <div class="title text-8xl font-bold tracking-[-4px] text-white mb-4">BINGO</div>
-                    <div class="text-4xl text-emerald-400">${currentGroup}조 승리!</div>
+                <div class="text-center px-10">
+                    <div class="text-[180px] mb-6">🎉</div>
+                    <div class="title text-8xl font-bold tracking-tighter text-white">BINGO!</div>
+                    <div class="text-5xl text-emerald-400 mt-4">${currentGroup}조 완성</div>
                     <button onclick="this.closest('div').remove()" 
-                            class="mt-12 px-20 py-7 bg-white text-black text-2xl font-semibold rounded-3xl hover:scale-110 transition">
-                        멋져요!
+                            class="mt-12 px-16 py-6 bg-white text-black text-2xl font-semibold rounded-3xl hover:scale-110 transition">
+                        축하합니다
                     </button>
                 </div>
             `;
             document.body.appendChild(div);
         }
 
-        // ==================== 기능 버튼 ====================
         function resetCurrentGroup() {
-            if (!confirm(`${currentGroup}조의 마킹을 모두 지우시겠습니까?`)) return;
+            if (!confirm(`${currentGroup}조의 모든 마킹을 초기화할까요?`)) return;
             groupMarked[currentGroup] = [];
             saveData();
             renderBoard();
         }
 
-        function reshuffleWarning() {
-            alert("번호 재배치는 관리자 페이지에서만 가능합니다.\nadmin.html로 이동해주세요.");
-        }
-
-        // ==================== 데이터 불러오기 ====================
+        // ==================== 모달 ====================
         function showImportModal() {
             document.getElementById('import-modal').classList.remove('hidden');
-            document.getElementById('import-json').focus();
         }
         function hideImportModal() {
             document.getElementById('import-modal').classList.add('hidden');
         }
         function importData() {
             try {
-                const json = document.getElementById('import-json').value.trim();
-                const imported = JSON.parse(json);
-                
+                const jsonStr = document.getElementById('import-json').value.trim();
+                const imported = JSON.parse(jsonStr);
                 if (imported.cells && Array.isArray(imported.cells)) {
                     sharedCells = imported.cells;
                     saveData();
                     hideImportModal();
                     renderBoard();
-                    alert("✅ 모든 조의 빙고판이 업데이트되었습니다!");
+                    alert('✅ 모든 조에 동일한 빙고판이 적용되었습니다!');
                 } else {
-                    alert("올바른 JSON 형식이 아닙니다.");
+                    alert('JSON 형식이 올바르지 않습니다.');
                 }
             } catch(e) {
-                alert("JSON 파싱 실패. 정확히 복사했는지 확인해주세요.");
+                alert('JSON 파싱 오류입니다. 정확히 복사했는지 확인해주세요.');
             }
         }
 
@@ -371,9 +373,6 @@
             loadData();
             createTabs();
             switchGroup(1);
-            
-            // Tailwind 실행
-            document.documentElement.style.setProperty('--tw-ring-color', 'rgb(163 163 163)');
         };
     </script>
 </body>
