@@ -10,17 +10,13 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .title { font-family: 'Space Grotesk', sans-serif; }
-        .tab-active { background-color: #10b981 !important; color: black !important; }
     </style>
 </head>
 <body class="bg-zinc-950 text-zinc-100 min-h-screen">
-    <div class="max-w-7xl mx-auto px-8 py-12">
+    <div class="max-w-7xl mx-auto px-4 md:px-8 py-12">
         <h1 class="title text-5xl font-bold mb-10">BINGO 관리자</h1>
-
-        <!-- 7개 탭 -->
         <div class="flex flex-wrap gap-2 mb-10 bg-zinc-900 p-2 rounded-3xl" id="admin-tabs"></div>
-
-        <div id="content" class="bg-zinc-900 rounded-3xl p-10"></div>
+        <div id="content" class="bg-zinc-900 rounded-3xl p-6 md:p-10"></div>
     </div>
 
     <script>
@@ -29,24 +25,17 @@
 
         function loadData() {
             const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                const d = JSON.parse(saved);
-                sharedCells = d.cells || Array.from({length:16}, () => ({mission: "", approved: {}, pending: {}}));
-            } else {
-                sharedCells = Array.from({length:16}, () => ({mission: "", approved: {}, pending: {}}));
-            }
+            if (saved) sharedCells = JSON.parse(saved).cells || Array.from({length:16}, () => ({mission: "", approved: {}, pending: {}}));
             renderTabs();
             showMissionTab();
         }
 
         function renderTabs() {
             const container = document.getElementById('admin-tabs');
-            container.innerHTML = `
-                <button onclick="showMissionTab()" class="tab-btn flex-1 py-5 text-lg font-semibold rounded-3xl">1. 미션 설정</button>
-            `;
-            for (let g = 1; g <= 6; g++) {
+            container.innerHTML = `<button onclick="showMissionTab()" class="flex-1 py-4 bg-emerald-600 rounded-3xl font-semibold">1. 미션 설정</button>`;
+            for (let g=1; g<=6; g++) {
                 const btn = document.createElement('button');
-                btn.className = `tab-btn flex-1 py-5 text-lg font-semibold rounded-3xl`;
+                btn.className = `flex-1 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-3xl font-medium`;
                 btn.textContent = `${g}조 관리`;
                 btn.onclick = () => showGroupTab(g);
                 container.appendChild(btn);
@@ -54,59 +43,62 @@
         }
 
         function showMissionTab() {
-            let html = `<h2 class="text-3xl font-semibold mb-8">미션 설정 (모든 조 공통)</h2><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">`;
+            let html = `<h2 class="text-3xl mb-8">미션 설정 (모든 조 공통)</h2><div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">`;
             sharedCells.forEach((cell, i) => {
                 html += `
                     <div class="bg-zinc-800 p-6 rounded-3xl">
-                        <div class="text-emerald-400 text-sm mb-2">칸 ${i+1}</div>
-                        <textarea rows="4" class="w-full bg-black border border-zinc-700 rounded-2xl p-5 text-sm" 
-                                  onchange="sharedCells[${i}].mission = this.value">${cell.mission || ''}</textarea>
+                        <div class="text-emerald-400 mb-2">칸 ${i+1}</div>
+                        <textarea rows="4" class="w-full bg-black border border-zinc-700 rounded-2xl p-5" onchange="sharedCells[${i}].mission = this.value">${cell.mission || ''}</textarea>
                     </div>`;
             });
-            html += `</div><button onclick="saveAll()" class="mt-10 px-12 py-5 bg-white text-black rounded-3xl font-bold">모든 미션 저장</button>`;
+            html += `</div><button onclick="saveAll()" class="mt-10 px-12 py-5 bg-white text-black rounded-3xl font-bold">미션 저장</button>`;
             document.getElementById('content').innerHTML = html;
         }
 
         function showGroupTab(group) {
-            let leftHTML = `<div class="w-5/12"><h3 class="text-2xl mb-6">${group}조 빙고판 (현재 상태)</h3><div class="grid grid-cols-4 gap-4">`;
+            let left = `<div class="w-full lg:w-5/12"><h3 class="text-2xl mb-6">${group}조 빙고판</h3><div class="grid grid-cols-4 gap-3">`;
             sharedCells.forEach((cell, idx) => {
                 const photo = cell.approved[group] || '';
-                leftHTML += `<div class="aspect-square rounded-2xl border border-zinc-700 overflow-hidden" style="background-image:url('${photo || 'https://picsum.photos/id/1015/800/600'}'); background-size:cover;"></div>`;
+                left += `<div class="aspect-square rounded-2xl border border-zinc-700 overflow-hidden" style="background-image:url('${photo || 'https://picsum.photos/id/1015/800/600'}'); background-size:cover;"></div>`;
             });
-            leftHTML += `</div></div>`;
+            left += `</div></div>`;
 
-            let rightHTML = `<div class="w-7/12 pl-12"><h3 class="text-2xl mb-6">${group}조 제출 대기 사진</h3>`;
-            let hasPending = false;
+            let right = `<div class="w-full lg:w-7/12 pl-0 lg:pl-12"><h3 class="text-2xl mb-6">${group}조 제출 대기 사진</h3>`;
+            let hasAny = false;
             sharedCells.forEach((cell, idx) => {
-                if (cell.pending && cell.pending[group]) {
-                    hasPending = true;
-                    rightHTML += `
-                        <div class="bg-zinc-800 rounded-3xl p-6 mb-8">
-                            <div class="font-medium mb-4">${cell.mission || `칸 ${idx+1}`}</div>
-                            <img src="${cell.pending[group]}" class="w-full rounded-2xl mb-6 border border-zinc-600">
-                            <button onclick="approvePhoto(${idx}, ${group})" 
-                                    class="w-full py-5 bg-emerald-600 hover:bg-emerald-500 rounded-3xl font-bold">✅ 이 사진 승인하기</button>
-                        </div>`;
+                if (cell.pending && cell.pending[group] && cell.pending[group].length > 0) {
+                    hasAny = true;
+                    cell.pending[group].forEach((photo, pIdx) => {
+                        right += `
+                            <div class="bg-zinc-800 rounded-3xl p-6 mb-8">
+                                <div class="font-medium mb-4">${cell.mission || `칸 ${idx+1}`}</div>
+                                <img src="${photo}" class="w-full rounded-2xl mb-6">
+                                <button onclick="approvePhoto(${idx}, ${group}, ${pIdx})" 
+                                        class="w-full py-5 bg-emerald-600 rounded-3xl font-bold">✅ 이 사진 승인</button>
+                            </div>`;
+                    });
                 }
             });
-            if (!hasPending) rightHTML += `<div class="text-zinc-500 text-center py-20">현재 제출된 사진이 없습니다.</div>`;
-            rightHTML += `</div>`;
+            if (!hasAny) right += `<div class="py-20 text-center text-zinc-500">아직 제출된 사진이 없습니다.</div>`;
+            right += `</div>`;
 
-            document.getElementById('content').innerHTML = `<div class="flex gap-8">${leftHTML}${rightHTML}</div>`;
+            document.getElementById('content').innerHTML = `<div class="flex flex-col lg:flex-row gap-10">${left}${right}</div>`;
         }
 
-        function approvePhoto(idx, group) {
+        function approvePhoto(idx, group, pIdx) {
+            const photo = sharedCells[idx].pending[group][pIdx];
             if (!sharedCells[idx].approved) sharedCells[idx].approved = {};
-            sharedCells[idx].approved[group] = sharedCells[idx].pending[group];
-            delete sharedCells[idx].pending[group];
+            sharedCells[idx].approved[group] = photo;
+            sharedCells[idx].pending[group].splice(pIdx, 1);
+            if (sharedCells[idx].pending[group].length === 0) delete sharedCells[idx].pending[group];
             saveAll();
-            alert(`${group}조 칸 ${idx+1} 사진이 승인되었습니다!`);
+            alert(`${group}조 사진 승인 완료!`);
             showGroupTab(group);
         }
 
         function saveAll() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({cells: sharedCells}));
-            alert("저장 완료되었습니다.\nindex.html을 새로고침하면 최신 미션이 적용됩니다.");
+            alert("저장 완료! index.html을 새로고침하세요.");
         }
 
         window.onload = loadData;
